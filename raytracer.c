@@ -83,6 +83,8 @@ void set_pixel_color(vec3f color, vec2f cord, unsigned char * array, int width){
 	material blue;
 	material white;
 	
+	material shadow;
+	
 	sphere sph1;
 	sphere sph2;
 	sphere sph3;
@@ -177,10 +179,12 @@ void sphere_intersect(RayHit * rayHit) {
 				if(diffuse < .2){
 					diffuse = .2;
 				}
-
+				
 				rayHit->color.x = rayHit->color.x *  diffuse;
 				rayHit->color.y = rayHit->color.y *  diffuse;
 				rayHit->color.z = rayHit->color.z *  diffuse;
+				
+				
 
 				
 			}
@@ -239,13 +243,24 @@ void triangle_intersect(RayHit * rayHit) {
 
 
 		// Calculate Shadows ? Maybe.
-
-
-
-		rayHit->color = tri[i].mat.color;	
-		rayHit->color.x = rayHit->color.x *  diffuse;
-		rayHit->color.y = rayHit->color.y *  diffuse;
-		rayHit->color.z = rayHit->color.z *  diffuse;
+		Ray lightRay;
+		lightRay.vector = light_vector;
+		lightRay.posn = intersection_vec;
+		
+		RayHit rayHit_shadow;
+		memset(&rayHit_shadow, 0, sizeof(rayHit_shadow));
+		rayHit_shadow.ray = lightRay;
+		sphere_intersect(&rayHit_shadow);
+		
+		// Hmm.........
+		if(rayHit_shadow.time >= 0){
+			rayHit->color = shadow.color;
+		}else{
+			rayHit->color = tri[i].mat.color;	
+			rayHit->color.x = rayHit->color.x *  diffuse;
+			rayHit->color.y = rayHit->color.y *  diffuse;
+			rayHit->color.z = rayHit->color.z *  diffuse;
+		}
 	}
 }
 
@@ -279,7 +294,10 @@ int main(int argc, char *argv[]){
 
 	white.reflective = 0;
 	white.color = vec3(255,255,255);
-
+	
+	shadow.reflective = 0;
+	shadow.color = vec3(45,43,43);
+	
 	light_source = vec3(3,5,-15);
 	
 	// Handle command line arguments
