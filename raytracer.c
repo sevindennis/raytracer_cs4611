@@ -29,6 +29,7 @@ typedef struct {
 	int reflective;
 	vec3f hitPoint;
 	vec3f color;
+	int shadow;
 } RayHit;
 
 /* Perspective matrix structure */
@@ -101,11 +102,7 @@ void referenceGeometry() {
 	// create three spheres
 	
 	sphere_new(vec3(0,0,-16), 2, &sph1, refl);
-
-	
 	sphere_new(vec3(3,-1,-14), 1, &sph2, refl);
-
-	
 	sphere_new(vec3(-3,-1,-14), 1, &sph3, red);
 
 	// back wall
@@ -145,24 +142,32 @@ void sphere_intersect(RayHit * rayHit) {
 	rayHit->time_hit = -1;
 	rayHit->color = vec3(0, 0, 0);
 
+	
+
 
 	for( int i = 0; i < sphere_index; i++) {
 		float front = vec3_dot(negate(rayHit->ray.vector), vec3_sub(rayHit->ray.posn,sph[i].pos));
 		float second = pow(vec3_dot(rayHit->ray.vector, vec3_sub(rayHit->ray.posn,sph[i].pos)), 2) - (vec3_dot(rayHit->ray.vector, rayHit->ray.vector) * (vec3_dot(vec3_sub(rayHit->ray.posn,sph[i].pos), vec3_sub(rayHit->ray.posn,sph[i].pos)) - pow(sph[i].radius, 2)));
 
 		if( second < 0 ) {
-			//printf( "no solution" );
+			
 		} else {
 			second = sqrt(second);
 			time_hit0 = (front + second) / vec3_dot(rayHit->ray.vector, rayHit->ray.vector);
 			time_hit1 = (front - second) / vec3_dot(rayHit->ray.vector, rayHit->ray.vector);
-			//printf("%d %f, %f\n",i, time_hit0, time_hit1);
-			
+	
 			truetime_hit = time_hit0 < time_hit1 ? time_hit0 : time_hit1;
+
+			if(truetime_hit < rayHit->time_hit){
+				continue;
+			}
+
 			if( truetime_hit < rayHit->time_hit || rayHit->time_hit < 0 ) {
 				rayHit->time_hit = truetime_hit;
-				//printf("setting color %f %f\n", sph[i].mat.color.x, sph[i].mat.color.y);
 
+				if(rayHit->shadow == 1){
+					return;
+				}
 
 				vec3f intersection_vec = rayHit->ray.vector;
 				intersection_vec.x = intersection_vec.x * truetime_hit + rayHit->ray.posn.x;
@@ -184,21 +189,40 @@ void sphere_intersect(RayHit * rayHit) {
 				rayHit->color.y = rayHit->color.y *  diffuse;
 				rayHit->color.z = rayHit->color.z *  diffuse;
 
-				rayHit->reflective = sph[i].mat.reflective;
-				rayHit->hitPoint = intersection_vec;
-				float refl_dot = 2 * vec3_dot(intersection_vec, normal);
-				vec3f relf_normal = vec3_mult(normal, refl_dot);
-				rayHit->normal = vec3_sub(intersection_vec,relf_normal);
+				// Calculate Shadows 
+				Ray lightRay;
+				lightRay.vector = light_vector;
+				lightRay.posn = intersection_vec;
+				
+				RayHit rayHit_shadow;
+				rayHit_shadow.ray = lightRay;
+				rayHit_shadow.shadow = 1;
+				sphere_intersect(&rayHit_shadow);
+				
+				if(rayHit_shadow.time_hit > rayHit->time_hit){
+					rayHit->color = shadow.color;
+				}
 
-			}
-		}	
+				if(rayHit->reflective == 1){
+					rayHit->reflective = 0;
+				}else{
+					rayHit->reflective = sph[i].mat.reflective;
+					rayHit->hitPoint = intersection_vec;
+					float refl_dot = 2 * vec3_dot(intersection_vec, normal);
+					vec3f relf_normal = vec3_mult(normal, refl_dot);
+					rayHit->normal = vec3_sub(intersection_vec,relf_normal);
+				}
+			}	
+		}
 	}
 }
 
 /* Checks for intersection between a triangle and a ray */
 void triangle_intersect(RayHit * rayHit) {
+	rayHit->time_hit = -1;
 	float A, B, C, D, E, F, G, H, I, J, K, L, M, beta, gamma, time_hit;
 	for( int i = 0; i < triangle_index; i++) {
+
 		triangle temp = tri[i];
 		A = temp.posA.x - temp.posB.x;
 		B = temp.posA.y - temp.posB.y;
@@ -209,15 +233,16 @@ void triangle_intersect(RayHit * rayHit) {
 		G = rayHit->ray.vector.x;
 		H = rayHit->ray.vector.y;
 		I = rayHit->ray.vector.z;
-		J = temp.posA.x - 0;
-		K = temp.posA.y - 0;
-		L = temp.posA.z - 0;
+		J = temp.posA.x - rayHit->ray.posn.x;
+		K = temp.posA.y - rayHit->ray.posn.y;
+		L = temp.posA.z - rayHit->ray.posn.z;
 		
 		M = A * ( E * I - H * F) + B * ( G * F - D * I ) + C * ( D * H - E * G );	
 		time_hit = (-1 * (F * (A * K - J * B) + E * (J * C - A * L) + D * ( B * L - K * C) )) / M;
-		if( time_hit < 0  ) {
+		if(time_hit < 0){
 			continue;
 		}
+	
 		gamma = ( I * ( A * K - J * B ) + H * ( J * C - A * L ) + G * (B * L - K * C )) / M;
 		if( gamma < 0 || gamma > 1 ) {
 			continue;
@@ -226,47 +251,50 @@ void triangle_intersect(RayHit * rayHit) {
 		if( beta < 0 || beta > 1 - gamma ) {
 			continue;
 		}
-
 		
-		if(time_hit > rayHit->time_hit ){
-			rayHit->time_hit = time_hit;
 		
-		 	vec3f intersection_vec = rayHit->ray.vector;
-			intersection_vec.x = intersection_vec.x * time_hit + rayHit->ray.posn.x;
-			intersection_vec.y = intersection_vec.y * time_hit + rayHit->ray.posn.y;
-			intersection_vec.z = intersection_vec.z * time_hit + rayHit->ray.posn.z;
+	
+		rayHit->time_hit = time_hit;
 
-			vec3f v1 = vec3_sub(temp.posA,temp.posB);
-			vec3f v2 = vec3_sub(temp.posC,temp.posB);
-
-			vec3f normal = normalize(vec3_cross(v2,v1));
-			vec3f light_vector = normalize(vec3_sub( light_source, intersection_vec));
+		if(rayHit->shadow == 1){
+			return;
+		}
 		
-			float diffuse = vec3_dot(normal,light_vector);
+		
+	 	vec3f intersection_vec = rayHit->ray.vector;
+		intersection_vec.x = intersection_vec.x * time_hit + rayHit->ray.posn.x;
+		intersection_vec.y = intersection_vec.y * time_hit + rayHit->ray.posn.y;
+		intersection_vec.z = intersection_vec.z * time_hit + rayHit->ray.posn.z;
 
-			if(diffuse < .2){
-				diffuse = .2;
-			}
+		vec3f v1 = vec3_sub(temp.posA,temp.posB);
+		vec3f v2 = vec3_sub(temp.posC,temp.posB);
 
-			rayHit->color = tri[i].mat.color;	
-			rayHit->color.x = rayHit->color.x *  diffuse;
-			rayHit->color.y = rayHit->color.y *  diffuse;
-			rayHit->color.z = rayHit->color.z *  diffuse;
+		vec3f normal = normalize(vec3_cross(v2,v1));
+		vec3f light_vector = normalize(vec3_sub( light_source, intersection_vec));
+	
+		float diffuse = vec3_dot(normal,light_vector);
 
-			// Calculate Shadows 
-			Ray lightRay;
-			lightRay.vector = light_vector;
-			lightRay.posn = intersection_vec;
-			
-			RayHit rayHit_shadow;
-			memset(&rayHit_shadow, 0, sizeof(rayHit_shadow));
-			rayHit_shadow.ray = lightRay;
-			sphere_intersect(&rayHit_shadow);
-			
-			
-			if(rayHit_shadow.time_hit >= 0){
-				rayHit->color = shadow.color;
-			}
+		if(diffuse < .2){
+			diffuse = .2;
+		}
+
+		rayHit->color = tri[i].mat.color;	
+		rayHit->color.x = rayHit->color.x *  diffuse;
+		rayHit->color.y = rayHit->color.y *  diffuse;
+		rayHit->color.z = rayHit->color.z *  diffuse;
+
+		// Calculate Shadows 
+		Ray lightRay;
+		lightRay.vector = light_vector;
+		lightRay.posn = intersection_vec;
+		
+		RayHit rayHit_shadow;
+		rayHit_shadow.ray = lightRay;
+		rayHit_shadow.shadow = 1;
+		sphere_intersect(&rayHit_shadow);
+		
+		if(rayHit_shadow.time_hit >= 0){
+			rayHit->color = shadow.color;
 		}
 	}
 }
@@ -372,44 +400,46 @@ int main(int argc, char *argv[]){
 			rayHit_tri.ray = myRay;
 			triangle_intersect(&rayHit_tri);
 			
-
-			if(rayHit_sph.reflective == 1){
+			int count = 0;
+			while(rayHit_sph.reflective == 1 && count != 10){
 
 				vec3f temp1 = rayHit_sph.normal;
 				vec3f temp2 = rayHit_sph.hitPoint;
 
+
 				rayHit_sph.ray.vector = temp1;
 				rayHit_sph.ray.posn = temp2;
 				sphere_intersect(&rayHit_sph);
+				//If you hit another reflective object
+				
 
-				//No hit on any sphere
-				if(rayHit_sph.time_hit < 0){
-					//Test for triangles
+				rayHit_tri.ray.vector = temp1;
+				rayHit_tri.ray.posn = temp2;
+				triangle_intersect(&rayHit_tri);
 
-					rayHit_sph.ray.vector = temp1;
-					rayHit_sph.ray.posn = temp2;
-					triangle_intersect(&rayHit_sph);
-
-					set_pixel_color(rayHit_sph.color, vec2(x, y), arrayContainingImage, myPer.screen_width_pixels);
-				}else{
-					//There was a hit, use that color
-					set_pixel_color(rayHit_sph.color, vec2(x, y), arrayContainingImage, myPer.screen_width_pixels);
-				}
-				//IF we hit nothing at all.... treat it black(void)
-				if(rayHit_sph.time_hit < 0){
-					rayHit_sph.color = vec3(0,0,0);
-					set_pixel_color(rayHit_sph.color, vec2(x, y), arrayContainingImage, myPer.screen_width_pixels);
-				}
-				//If no reflection		
-			}else{
 				// Color the pixel by the right object
-				if(rayHit_sph.time_hit >= 0){
+				if(rayHit_sph.time_hit > 0){
 					set_pixel_color(rayHit_sph.color, vec2(x, y), arrayContainingImage, myPer.screen_width_pixels);
-
 				}else{
-					set_pixel_color(rayHit_tri.color, vec2(x, y), arrayContainingImage, myPer.screen_width_pixels);
+					if(rayHit_tri.time_hit > 0){
+						set_pixel_color(rayHit_tri.color, vec2(x, y), arrayContainingImage, myPer.screen_width_pixels);
+					}else{
+						set_pixel_color(vec3(0,0,0), vec2(x, y), arrayContainingImage, myPer.screen_width_pixels);
+					}
+					
 				}
+				count++;
 			}
+			if(rayHit_sph.reflective == 1){
+				continue;
+			}
+			// Color the pixel by the right object
+			if(rayHit_sph.time_hit > 0){
+				set_pixel_color(rayHit_sph.color, vec2(x, y), arrayContainingImage, myPer.screen_width_pixels);
+			}else{
+				set_pixel_color(rayHit_tri.color, vec2(x, y), arrayContainingImage, myPer.screen_width_pixels);
+			}
+		
 					
 		}
 	}
