@@ -1,3 +1,7 @@
+/*
+* Authors: Sevin Dennis and Ben Vessel... Just mentioning this.
+*	Already aware of that we worked together with Prof. Kulh
+*/
 #ifndef _VECRAYTRACER_
 #define _VECRAYTRACER_
 

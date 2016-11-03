@@ -7,17 +7,21 @@
 #define ARRAY_OBJECTS 500
 
 /* Start of geom header */
+
+/* A data type for material*/
 typedef struct {
 	int reflective;
 	vec3f color;
 } material;
 
+/* A data type for geometry*/
 typedef struct {
 	vec3f pos;
 	float radius;
 	material mat;
 } sphere;
 
+/* A data type for geometry*/
 typedef struct {
 	vec3f posA;
 	vec3f posB;

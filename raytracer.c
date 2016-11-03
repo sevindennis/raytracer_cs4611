@@ -1,7 +1,10 @@
-/* Author: Sevin Dennis, Ben Vesel
- * Program: RayTracer
+/* Author: Sevin Dennis, Ben Vesel <- (10/31/2016)
+ * Program: RayTracer CS4611 
  * Course: CS4611
+ * Sevin Dennis and Ben Vessel... Just mentioning this.
+ *	Already aware of that we worked together with Prof. Kulh
  */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,7 +12,6 @@
 #include <math.h>
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
-
 #include "geom.h"
 #include "vec.h"
 
@@ -41,29 +43,26 @@ typedef struct {
   	float units_per_pixel;
 } Perspective;
 
+//Global Variables
+material refl;
+material red;
+material blue;
+material white;
 
-/* Used to test stbi_write_png to make sure it works */
-void color_array(unsigned char * array, long unsigned int size){
+material shadow;
 
-	long unsigned  i;
-	for(i = 0; i <= size; i++){
+sphere sph1;
+sphere sph2;
+sphere sph3;
+triangle back1;
+triangle back2;
+triangle bot1;
+triangle bot2;
+triangle right;
 
-		//Red
-		if(i % 3 == 0){
-			array[i]=0xFF;
+vec3f light_source;
 
-		//Green
-		} else if(i % 3 == 1){
-			//array[i]=0xFF;
-
-		//Blue
-		} else {
-			array[i] = 0xFF;;
-			
-		}
-	}
-}
-
+/* Used for debugging the color of a pixel */
 vec3f get_pixel_color(vec2f cord, unsigned char * array, int width){
 
 	int pos = (cord.y*3*width)+(cord.x*3);
@@ -71,6 +70,7 @@ vec3f get_pixel_color(vec2f cord, unsigned char * array, int width){
 	return vec3(array[pos],array[pos+1],array[pos+2]);
 }
 
+/* Used for setting the color of a pixel */
 void set_pixel_color(vec3f color, vec2f cord, unsigned char * array, int width){
 
 	int pos = (cord.y*3*width)+(cord.x*3);
@@ -79,45 +79,25 @@ void set_pixel_color(vec3f color, vec2f cord, unsigned char * array, int width){
 	array[pos+1] = color.y; //G
 	array[pos+2] = color.z; //B
 }
-	material refl;
-	material red;
-	material blue;
-	material white;
-	
-	material shadow;
-	
-	sphere sph1;
-	sphere sph2;
-	sphere sph3;
-	triangle back1;
-	triangle back2;
-	triangle bot1;
-	triangle bot2;
-	triangle right;
 
-	vec3f light_source;
-
+/* Reference Scene Hard Coded in */
 void referenceGeometry() {
 	
 	// create three spheres
-	
 	sphere_new(vec3(0,0,-16), 2, &sph1, refl);
 	sphere_new(vec3(3,-1,-14), 1, &sph2, refl);
 	sphere_new(vec3(-3,-1,-14), 1, &sph3, red);
 
 	// back wall
-	
 	triangle_new(vec3(-8,-2,-20),
 	vec3(8,-2,-20),
 	vec3(8,10,-20), &back1,blue);
 
-	
 	triangle_new(vec3(-8,-2,-20),
 		vec3(8,10,-20),
 		vec3(-8,10,-20), &back2,blue);
 
 	// floor
-	
 	triangle_new(vec3(-8,-2,-20),
 		vec3(8,-2,-10),
 		vec3(8,-2,-20), &bot1,white);
@@ -125,19 +105,17 @@ void referenceGeometry() {
 	triangle_new(vec3(-8,-2,-20),
 		vec3(-8,-2,-10),
 		vec3(8,-2,-10), &bot2,white);
+
 	// right red triangle
-	
 	triangle_new(vec3(8,-2,-20),
 		vec3(8,-2,-10),
 		vec3(8,10,-20), &right,red);
-
 }
 
+/* Custom/Fancy Scene Hard Coded in */
 void customGeometry() {
 	
 	// create three spheres
-	
-	
 	sphere_new(vec3(0,-2,-14), 1, &sph1, refl);
 	sphere_new(vec3(0,1,-14), 1.5, &sph2, refl);
 	sphere_new(vec3(0,4,-14), 1, &sph3, refl);
@@ -151,7 +129,6 @@ void customGeometry() {
 	sphere_new(vec3(5,4,-14), 1, &sph3, red);
 
 	// floor
-	
 	triangle_new(vec3(-8,-6,-20),
 		vec3(8,-6,-10),
 		vec3(8,-6,-20), &bot1,white);
@@ -159,7 +136,6 @@ void customGeometry() {
 	triangle_new(vec3(-8,-6,-20),
 		vec3(-8,-6,-10),
 		vec3(8,-6,-10), &bot2,white);
-	// right red triangle
 
 	// Ceiling
 	triangle_new(vec3(-8,8,-20),
@@ -169,8 +145,6 @@ void customGeometry() {
 	triangle_new(vec3(-8,8,-20),
 		vec3(-8,8,-10),
 		vec3(8,8,-10), &bot2,white);
-	// right red triangle
-	
 }
 
 /* Checks for intersection between a triangle and a ray */
@@ -181,9 +155,6 @@ void sphere_intersect(RayHit * rayHit) {
 	float truetime_hit;
 	rayHit->time_hit = -1;
 	rayHit->color = vec3(0, 0, 0);
-
-	
-
 
 	for( int i = 0; i < sphere_index; i++) {
 		float front = vec3_dot(negate(rayHit->ray.vector), vec3_sub(rayHit->ray.posn,sph[i].pos));
@@ -198,6 +169,7 @@ void sphere_intersect(RayHit * rayHit) {
 	
 			truetime_hit = time_hit0 < time_hit1 ? time_hit0 : time_hit1;
 
+			//T wont be negative... thats behind you
 			if(truetime_hit < 0){
 				continue;
 			}
@@ -210,52 +182,57 @@ void sphere_intersect(RayHit * rayHit) {
 					return;
 				}
 
+				// Calculate intersection Vector
 				vec3f intersection_vec = rayHit->ray.vector;
 				intersection_vec.x = intersection_vec.x * truetime_hit + rayHit->ray.posn.x;
 				intersection_vec.y = intersection_vec.y * truetime_hit + rayHit->ray.posn.y;
 				intersection_vec.z = intersection_vec.z * truetime_hit + rayHit->ray.posn.z;
 
+				// Calculate normals and light vector
 				vec3f normal = normalize(vec3_sub(intersection_vec, sph[i].pos));
 				vec3f light_vector = normalize(vec3_sub( light_source, intersection_vec));
 				
+				// Calculate diffuse shading
 				float diffuse = vec3_dot(normal,light_vector);
-
-				rayHit->color = sph[i].mat.color;
 
 				if(diffuse < .2){
 					diffuse = .2;
 				}
 				
+				// Set the colors
+				rayHit->color = sph[i].mat.color;
 				rayHit->color.x = rayHit->color.x *  diffuse;
 				rayHit->color.y = rayHit->color.y *  diffuse;
 				rayHit->color.z = rayHit->color.z *  diffuse;
 
 				// Calculate Shadows 
 				Ray lightRay;
-				//Nudge it a tiny bit
+
+				//Nudge the intersect point a tiny bit... reduce static
 				intersection_vec.x = intersection_vec.x + .00001*intersection_vec.x;
-				intersection_vec.y = intersection_vec.y + .00001*intersection_vec.y;
-				intersection_vec.z = intersection_vec.z + .00001*intersection_vec.z;
+				
 
 				lightRay.vector = light_vector;
 				lightRay.posn = intersection_vec;
 				
+				//Create a rayhit shadow object
 				RayHit rayHit_shadow;
 				rayHit_shadow.ray = lightRay;
 				rayHit_shadow.shadow = 1;
 				sphere_intersect(&rayHit_shadow);
 				
+				// Hit something, then its in a shade
 				if(rayHit_shadow.time_hit > rayHit->time_hit){
 					rayHit->color = vec3_mult(shadow.color, diffuse+1.3);
 				}
 
-				
-					rayHit->reflective = sph[i].mat.reflective;
-					rayHit->hitPoint = intersection_vec;
-					float refl_dot = 2 * vec3_dot(intersection_vec, normal);
-					vec3f relf_normal = vec3_mult(normal, refl_dot);
-					rayHit->normal = normalize(vec3_sub(intersection_vec,relf_normal));
-				
+				//Calculate reflection options for if the object is reflective
+				rayHit->reflective = sph[i].mat.reflective;
+				rayHit->hitPoint = intersection_vec;
+				float refl_dot = 2 * vec3_dot(intersection_vec, normal);
+				vec3f relf_normal = vec3_mult(normal, refl_dot);
+				rayHit->normal = normalize(vec3_sub(intersection_vec,relf_normal));
+			
 			}	
 		}
 	}
@@ -265,6 +242,7 @@ void sphere_intersect(RayHit * rayHit) {
 void triangle_intersect(RayHit * rayHit) {
 	rayHit->time_hit = -1;
 	float A, B, C, D, E, F, G, H, I, J, K, L, M, beta, gamma, time_hit;
+
 	for( int i = 0; i < triangle_index; i++) {
 
 		triangle temp = tri[i];
@@ -280,13 +258,15 @@ void triangle_intersect(RayHit * rayHit) {
 		J = temp.posA.x - rayHit->ray.posn.x;
 		K = temp.posA.y - rayHit->ray.posn.y;
 		L = temp.posA.z - rayHit->ray.posn.z;
+
+		//All copied from slides 
 		
 		M = A * ( E * I - H * F) + B * ( G * F - D * I ) + C * ( D * H - E * G );	
 		time_hit = (-1 * (F * (A * K - J * B) + E * (J * C - A * L) + D * ( B * L - K * C) )) / M;
 		if(time_hit < 0){
 			continue;
 		}
-	
+		
 		gamma = ( I * ( A * K - J * B ) + H * ( J * C - A * L ) + G * (B * L - K * C )) / M;
 		if( gamma < 0 || gamma > 1 ) {
 			continue;
@@ -296,7 +276,7 @@ void triangle_intersect(RayHit * rayHit) {
 			continue;
 		}
 		
-		
+		// If it made this far, from the above code.... you hit a triangle
 		if(rayHit->time_hit > time_hit){
 			continue;
 			
@@ -308,6 +288,7 @@ void triangle_intersect(RayHit * rayHit) {
 			return;
 		}
 		
+		//Do the same steps from when you hit a circle
 		
 	 	vec3f intersection_vec = rayHit->ray.vector;
 		intersection_vec.x = intersection_vec.x * time_hit + rayHit->ray.posn.x;
@@ -336,8 +317,7 @@ void triangle_intersect(RayHit * rayHit) {
 
 		//Nudge it a tiny bit
 		intersection_vec.x = intersection_vec.x + .00001*intersection_vec.x;
-		intersection_vec.y = intersection_vec.y + .00001*intersection_vec.y;
-		intersection_vec.z = intersection_vec.z + .00001*intersection_vec.z;
+		
 
 		lightRay.vector = light_vector;
 		lightRay.posn = intersection_vec;
@@ -440,8 +420,6 @@ int main(int argc, char *argv[]){
 		}
 	}
 
-
-	
 	//Generate the array for the Image
 	unsigned long size = height * width * 3 * sizeof(unsigned char);
 	unsigned char * arrayContainingImage = malloc(size);
@@ -450,12 +428,7 @@ int main(int argc, char *argv[]){
 		printf("Failed to allocate memory.  Exiting\n");
 		exit(10);
 	}
-
 	
-
-	// Color the array
-	//color_array(arrayContainingImage, size); //Temp Coloring to test writing image
-
 	//Our camera pos and perspective
 	Perspective myPer;
 	myPer.camera_pos = vec3(0,0,0); // Camera Pos
@@ -528,6 +501,7 @@ int main(int argc, char *argv[]){
 
 				}
 
+				/*  Alogrithum to set the colors :)   */
 				
 				if(rayHit_tri->time_hit > 0){
 						set_pixel_color(rayHit_tri->color, vec2(x, y), arrayContainingImage, myPer.screen_width_pixels);
