@@ -48,6 +48,7 @@ material refl;
 material red;
 material blue;
 material white;
+material yellow;
 
 material shadow;
 
@@ -120,13 +121,13 @@ void customGeometry() {
 	sphere_new(vec3(0,1,-14), 1.5, &sph2, refl);
 	sphere_new(vec3(0,4,-14), 1, &sph3, refl);
 
-	sphere_new(vec3(-5,-2,-14), 1, &sph1, red);
+	sphere_new(vec3(-5,-2,-14), 1, &sph1, yellow);
 	sphere_new(vec3(-5,1,-14), 1, &sph2, refl);
 	sphere_new(vec3(-5,4,-14), 1, &sph3, red);
 
 	sphere_new(vec3(5,-2,-14), 1, &sph1, red);
 	sphere_new(vec3(5,1,-14), 1, &sph2, refl);
-	sphere_new(vec3(5,4,-14), 1, &sph3, red);
+	sphere_new(vec3(5,4,-14), 1, &sph3, yellow);
 
 	// floor
 	triangle_new(vec3(-8,-6,-20),
@@ -210,6 +211,7 @@ void sphere_intersect(RayHit * rayHit) {
 
 				//Nudge the intersect point a tiny bit... reduce static
 				intersection_vec.x = intersection_vec.x + .00001*intersection_vec.x;
+				intersection_vec.y = intersection_vec.y + .00001*intersection_vec.y;
 				
 
 				lightRay.vector = light_vector;
@@ -317,6 +319,7 @@ void triangle_intersect(RayHit * rayHit) {
 
 		//Nudge it a tiny bit
 		intersection_vec.x = intersection_vec.x + .00001*intersection_vec.x;
+		intersection_vec.y = intersection_vec.y + .00001*intersection_vec.y;
 		
 
 		lightRay.vector = light_vector;
@@ -367,6 +370,9 @@ int main(int argc, char *argv[]){
 	
 	shadow.reflective = 0;
 	shadow.color = vec3(45,43,43);
+
+	yellow.reflective = 0;
+	yellow.color = vec3(255,255,0);
 	
 	
 	char * reference = "reference.png";
@@ -395,12 +401,13 @@ int main(int argc, char *argv[]){
 
 		if(imageFileName[0] == custom[0] || imageFileName[0] == fancy[0]){
 			if(imageFileName[0] == custom[0]){
+				printf("Using custom renderer, now rendering image for custom.\n");
 				customGeometry();
 				width = 2048;
 				height = 2048;
 				light_source = vec3(-5,189,-3);
 			}else{
-				printf("Using fancy\n");
+				printf("Using fancy renderer, now rendering image for custom.\n");
 				customGeometry();
 				width = 2300;
 				height = 2300;
